@@ -56,13 +56,15 @@ h1 {
     border-radius: 30px;
     border: none;
     padding: 10px 30px;
-    transition: all 0.3s ease;
+    transition: all 0.5s ease;
     width: 100%;
+    font-size: 1.2rem;
 }
 
 .stButton > button:hover {
-    box-shadow: 0 0 20px #00f3ff;
+    box-shadow: 0 0 25px #00f3ff;
     transform: scale(1.02);
+    background: linear-gradient(90deg, #00e6ff, #00b3ff);
 }
 
 /* File uploader */
@@ -117,13 +119,10 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("## 🛠️ Cleaning Options")
     
-    col1, col2 = st.columns(2)
-    with col1:
-        remove_duplicates = st.checkbox("🗑️ Remove duplicates", value=True)
-        fix_whitespace = st.checkbox("📝 Fix whitespace", value=True)
-    with col2:
-        fill_missing = st.checkbox("📊 Fill missing values", value=True)
-        lowercase_text = st.checkbox("🔡 Lowercase text", value=False)
+    remove_duplicates = st.checkbox("🗑️ Remove duplicate rows", value=True)
+    fix_whitespace = st.checkbox("📝 Fix whitespace in text", value=True)
+    fill_missing = st.checkbox("📊 Fill missing values (AI powered)", value=True)
+    lowercase_text = st.checkbox("🔡 Convert text to lowercase", value=False)
     
     st.markdown("---")
     st.markdown("### 📌 How to use")
@@ -131,7 +130,7 @@ with st.sidebar:
     1. Enter your Gemini API Key
     2. Upload CSV or Excel file
     3. Choose cleaning options
-    4. Click "Start Cleaning"
+    4. Click 'Start Cleaning'
     5. Download cleaned file
     """)
 
@@ -143,8 +142,8 @@ uploaded_file = st.file_uploader(
 )
 
 if uploaded_file is not None:
-    # Read file
     try:
+        # Read file
         if uploaded_file.name.endswith('.csv'):
             df = pd.read_csv(uploaded_file)
         else:
@@ -161,11 +160,11 @@ if uploaded_file is not None:
             if not api_key:
                 st.error("❌ Please enter your Gemini API Key in the sidebar")
             else:
-                with st.spinner("🧹 AI is cleaning your data... Please wait"):
+                with st.spinner("🧹 AI is cleaning your data... Please wait (10-30 seconds)"):
                     original_rows = len(df)
                     cleaning_log = []
                     
-                    # Configure Gemini
+                    # Configure Gemini with NEW MODEL
                     genai.configure(api_key=api_key)
                     model = genai.GenerativeModel('gemini-3-flash-preview')
                     
@@ -183,7 +182,7 @@ if uploaded_file is not None:
                             df[col] = df[col].astype(str).str.strip()
                         cleaning_log.append(f"📝 Fixed whitespace in {len(string_cols)} text columns")
                     
-                    # 3. Fill missing values with AI
+                    # 3. Fill missing values with AI (Gemini 3 Flash)
                     if fill_missing:
                         missing_cols = df.columns[df.isnull().any()].tolist()
                         
@@ -193,28 +192,28 @@ if uploaded_file is not None:
                                     sample_values = df[col].dropna().head(3).tolist()
                                     if sample_values:
                                         prompt = f"""Column '{col}' has missing values. Based on these examples: {sample_values}
-                                        What value should replace missing values? Answer with ONLY one value, no explanation."""
+                                        What value should replace missing values? Answer with ONLY one word or number, no explanation."""
                                         
                                         try:
                                             response = model.generate_content(prompt)
                                             fill_val = response.text.strip()
                                             df[col] = df[col].fillna(fill_val)
-                                            cleaning_log.append(f"🔮 Filled '{col}' missing with: {fill_val}")
+                                            cleaning_log.append(f"🤖 AI filled '{col}' missing with: {fill_val}")
                                         except:
-                                            df[col] = df[col].fillna("Unknown")
-                                            cleaning_log.append(f"⚠️ Filled '{col}' with: Unknown")
+                                            df[col] = df[col].fillna("Missing")
+                                            cleaning_log.append(f"⚠️ Filled '{col}' with: Missing")
                                 else:
                                     df[col] = df[col].fillna(df[col].median() if df[col].dtype in ['int64', 'float64'] else 0)
                                     cleaning_log.append(f"📊 Filled numeric missing in '{col}' with median/0")
                         else:
-                            cleaning_log.append("✅ No missing values found")
+                            cleaning_log.append("✅ No missing values found in any column")
                     
                     # 4. Lowercase text
                     if lowercase_text:
                         string_cols = df.select_dtypes(include=['object']).columns
                         for col in string_cols:
                             df[col] = df[col].astype(str).str.lower()
-                        cleaning_log.append(f"🔡 Converted {len(string_cols)} columns to lowercase")
+                        cleaning_log.append(f"🔡 Converted {len(string_cols)} text columns to lowercase")
                     
                     # Show results
                     st.markdown("---")
@@ -254,4 +253,4 @@ if uploaded_file is not None:
         st.info("💡 Make sure your file is valid CSV or Excel format")
 
 else:
-    st.info("👈 Upload a file to get started")
+    st.info("👈 Upload a CSV or Excel file to get started")
